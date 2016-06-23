@@ -33,7 +33,7 @@ Every test is described in a separate file in a JSON format with a following str
   "test_statements": [
     {"sql": "select 1 as t1, 1 as t2, 1 as t3 from rdb$database", 
      "expect_values": {"t1": "1"},
-     "expect_equals": ["t1", "t2", "t3"]}
+     "expect_equals": {["t1", "t2", "t3"]}
     }
 }
 
