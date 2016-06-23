@@ -17,7 +17,7 @@ After installing requirements script is self-sufficient and does not require any
 
 When run without any params or with -h script shows all available options. Typical command line might look like this
 ```bash
- python3 fdbtest.py -s 192.168.1.1 -d employee -user sysdba -pass changed_masterkey -t dir_with_tests -r dir_with_results
+ python3 fdbtest.py -d employee -u sysdba -p masterkey -t dir_with_tests -r dir_with_results
 ```
 ## Test contents
 
@@ -40,3 +40,10 @@ Every test is described in a separate file in a JSON format with a following str
 }
 
 ```
+Items "id", "name", "author" and "description" are just for idenifying a test and may contain any suitable information. Keep in mind, however, that in dir with results (if set) log files are created as "id".log.
+
+"data_files" are using for fullfilling database with a test data. 
+
+"test_files" can be used for testing.
+
+Files from both sections are running with firebird isql tool (you can also point out any particular binary through "-i" command line switch) if they have .sql extension and directly otherwise. That means that if you need to run some scripts during the test, you should have rights to execute them in the particular system.
