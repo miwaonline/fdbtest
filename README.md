@@ -48,7 +48,7 @@ Items "id", "name", "author" and "description" are just for idenifying a test an
 
 Files from both sections are running with firebird isql tool (you can also point out any particular binary through "-i" command line switch) if they have .sql extension and directly otherwise. That means that if you need to run some scripts during the test, you should have rights to execute them in the particular system.
 
-"test_statements" is the core of testing tool. In consists from unlimited number of sections with the following items
+"test_statements" is the core of testing tool. They consists of unlimited number of sections with the following items
 
  * "sql" - sql statement to be executed during the test
  * "expect_values" - list of values that are expected after executing mentioned statement.
@@ -61,14 +61,14 @@ Files from both sections are running with firebird isql tool (you can also point
 ### Variables
 After executing every statement all results are stored with their corresponding names and can be used in subsequent statements for comparison or as a params. Lets look at the following example:
 
-  {"sql": "select 1 as t1, 1 as t2, 1 as t3 from rdb$database", 
-   "expect_values": {"t1": "1", "t2": "1"},
-   "expect_equals": ["t1", "t2", "t3"]
-  }
+ {"sql": "select 1 as t1, 1 as t2, 1 as t3 from rdb$database", 
+ "expect_values": {"t1": "1", "t2": "1"},
+ "expect_equals": ["t1", "t2", "t3"]
+ }
 
 After processing this block we'll get thee variables "t1", "t2" and "t3" all with value "1". Now we can not only compare them in the same section, but also use in the followings:
 
-  {"sql": "intser into table1(field1, field2) values (?, ?)",
-   "params": ["t1", "t2"]
-  }
+ {"sql": "intser into table1(field1, field2) values (?, ?)",
+ "params": ["t1", "t2"]
+ }
 
