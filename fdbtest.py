@@ -174,7 +174,7 @@ class SingleTest:
                     exp_value = statement.get('expect_values')[exp]
                     res_value = str(test_vars[exp.upper()])
                     stmt_passed = stmt_passed and self.CompareValues(res_value, exp_value)
-            if statement.get('expect_equals'):
+            if stmt_passed and statement.get('expect_equals'):
                 for i in range(len(statement.get('expect_equals')) - 1):
                     v1 = statement.get('expect_equals')[i]
                     v2 = statement.get('expect_equals')[i+1]
