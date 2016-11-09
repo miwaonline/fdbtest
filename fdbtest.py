@@ -146,7 +146,10 @@ class SingleTest:
                 paramlist.append(test_vars[param.upper()])
         #execute statement and measure execution time
         timestart = time.time()
-        res = db.Execute(statement.get('sql'), paramlist)
+        if type(statement.get('sql')) is list:
+            res = db.Execute(" ".join(statement.get('sql')), paramlist)
+        else:
+            res = db.Execute(statement.get('sql'), paramlist)
         timefinish = time.time()
         #tuple with 3 items is standart fb error with items "errorstring",
         #deprecated "sqlcode" and "gdscode"; so we check both "expect_error_string"
