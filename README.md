@@ -40,13 +40,13 @@ Every test is described in a separate file in a JSON format with a following str
 }
 
 ```
-Items "id", "name", "author" and "description" are just for idenifying a test and may contain any suitable information. Keep in mind, however, that in dir with results (if set) log files are created as "id".log.
+Items "id", "name", "author" and "description" are using just for idenifying a test and may contain any suitable information. Keep in mind, however, that in dir with results (if set) log files are created as "id".log.
 
 "data_files" can be used for fullfilling database with a test data. Their executing can also be skipped with an option -n (-no_test_data) 
 
 "test_files" can be used for testing. If set, they are executed in given order and expected to be finished with status code 0.
 
-Files from both sections are running with firebird isql tool (you can also point out any particular binary through "-i" command line switch) if they have .sql extension and directly otherwise. That means that if you need to run some scripts during the test, you should have rights to execute them in the particular system.
+Files from both sections are running with firebird isql tool if they have .sql extension (you can also point out any particular binary through "-i" command line switch) and directly otherwise. This means that if you need to run some scripts during the test, you should have rights to execute them in your system.
 
 "test_statements" is the core of testing tool. They consists of unlimited number of sections with the following items
 
@@ -66,7 +66,7 @@ After executing every statement all results are stored with their corresponding 
    "expect_equals": ["t1", "t3"]
   }
 ```
-After processing this block we'll get thee variables "t1", "t2" and "t3" all with value "1". Now we can not only compare them in the same section, but also use in the followings:
+After processing this block we'll get thee variables "t1" and "t3" with value "1" and "t2" with value "100". Now we can not only compare them in the same section, but also use in the followings:
 ```json
  {"sql": "insert into table1(field1, field2) values (?, ?)",
  "params": ["t1", "t2"]
