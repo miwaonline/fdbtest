@@ -51,7 +51,7 @@ Files from both sections are running with firebird isql tool if they have .sql e
 "test_statements" is the core of testing tool. They consists of unlimited number of sections with the following items
 
  * "sql" - sql statement to be executed during the test
- * "expect_values" - list of values that are expected after executing mentioned statement.
+ * "expect_values" - list of values that are expected after executing mentioned statement. Simple comparisons like ">0" or "<10" can also be used.
  * "expect_equals" - list of variables, that are expected to be equal
  * "expect_error_gdscode" - GDS code of expected error. Test is considered as passed if this error occured after executing corresponding statement and failed otherwise
  * "expect_error_string" - string, that expected to be contained in raised error message. Test is considered as passed if error occured with appropriate message and failed in other case
@@ -66,7 +66,7 @@ After executing every statement all results are stored with their corresponding 
    "expect_equals": ["t1", "t3"]
   }
 ```
-After processing this block we'll get thee variables "t1" and "t3" with value "1" and "t2" with value "100". Now we can not only compare them in the same section, but also use in the followings:
+After processing this block we'll get thee variables: "t1" and "t3" with value "1" and "t2" with value "100". Now we can not only compare them in the same section, but also use in the followings:
 ```json
  {"sql": "insert into table1(field1, field2) values (?, ?)",
  "params": ["t1", "t2"]
