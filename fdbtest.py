@@ -43,7 +43,7 @@ class TestOptions:
             help='password for given username (default masterkey)',\
             default='masterkey')
         parser.add_argument('-b', '--use_backup', \
-                help='restore given backup file for a testing')
+            help='restore given backup file for a testing')
         parser.add_argument('-n', '--no_test_data', \
             help='dont process test data files from tests', \
             action='store_true', default=False)
@@ -151,10 +151,13 @@ class SingleTest:
         #and "expect_error_gdscode" (if set) to pass the test
         if type(res) is tuple and len(res) == 3:
             stmt_passed = False
+            subtest_failed = False
             if not statement.get('expect_error_gdscode') is None:
                 if str(res[2]) == statement.get('expect_error_gdscode'):
                     stmt_passed = True
-            if stmt_passed and not statement.get('expect_error_string') is None:
+                else:
+                    subtest_failed = True
+            if not (subtest_failed and statement.get('expect_error_string') is None):
                 if str(res[0]).find(statement.get('expect_error_string')) > -1:
                     stmt_passed = True
                 else:
@@ -341,4 +344,4 @@ if __name__ == '__main__':
         atest.RunFulltest(fb)
     else:
         print("{} is neither file nor dir so nothing to run".
-              format(opt.args.run_test))
+            format(opt.args.run_test))
