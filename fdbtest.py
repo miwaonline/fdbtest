@@ -58,6 +58,8 @@ class TestOptions:
             default='')
         parser.add_argument('-r', '--results_dir',\
             help='directory to store detailed information about executing tests')
+        parser.add_argument('-f', '--force_clean', action="store_true",\
+            help='remove .log files from directory with results before executing tests')
         TestOptions.args = parser.parse_args()
 
 class SingleTest:
@@ -157,7 +159,7 @@ class SingleTest:
                     stmt_passed = True
                 else:
                     subtest_failed = True
-            if not (subtest_failed and statement.get('expect_error_string') is None):
+            if not subtest_failed and not statement.get('expect_error_string') is None:
                 if str(res[0]).find(statement.get('expect_error_string')) > -1:
                     stmt_passed = True
                 else:
@@ -294,6 +296,10 @@ class Firebird:
 if __name__ == '__main__':
     opt = TestOptions()
     if opt.args.results_dir:
+        if opt.args.force_clean and os.path.exists(opt.args.results_dir):
+            for file in os.scandir(opt.args.results_dir):
+                if file.name.endswith(".log"):
+                    os.remove(file.path)
         if not os.path.exists(opt.args.results_dir):
             os.makedirs(opt.args.results_dir)
         logging.basicConfig(filename=opt.args.results_dir + os.sep + 'logfile.log',\
