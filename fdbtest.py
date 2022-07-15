@@ -32,7 +32,7 @@ class TestOptions:
             default='127.0.0.1')
         parser.add_argument('--port', \
             help='server port (default 3050)',\
-            default='3050')
+            default=3050)
         parser.add_argument('-d', '--database', \
             help='database file or alias to use for testing',\
             required=True)
@@ -252,7 +252,7 @@ class Firebird:
         self.password = 'masterkey'
         self.database = 'employee'
         self.host = '127.0.0.1'
-        self.port = '3050'
+        self.port = 3050
         self.charset = 'UTF8'
 
     def Connect(self, database, username='SYSDBA', password='masterkey', \
