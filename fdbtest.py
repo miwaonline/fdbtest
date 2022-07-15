@@ -74,8 +74,8 @@ class SingleTest:
             self.__dict__ = json.load(f, object_pairs_hook=collections.OrderedDict)
 
     def StoreRes(self, datastring):
-        if opt.args.results_dir:
-            with open(opt.args.results_dir + os.sep + self.id + '.log', mode='a', \
+        if TestOptions.args.results_dir:
+            with open(TestOptions.args.results_dir + os.sep + self.id + '.log', mode='a', \
                 encoding='utf-8') as f:
                 f.write(datastring + '\n' + ('=' * 80) + '\n')
 
@@ -296,7 +296,7 @@ class Firebird:
         finally:
             return res
 
-if __name__ == '__main__':
+def main():
     opt = TestOptions()
     if opt.args.results_dir:
         if opt.args.force_clean and os.path.exists(opt.args.results_dir):
@@ -354,3 +354,6 @@ if __name__ == '__main__':
     else:
         print("{} is neither file nor dir so nothing to run".
             format(opt.args.run_test))
+
+if __name__ == '__main__':
+    main()
