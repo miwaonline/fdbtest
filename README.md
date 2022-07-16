@@ -1,15 +1,20 @@
 # fdbtest
 Tool for testing firebird-driven databases
 
-## Requirements
+## Requirements and installation
 
 At the moment script requires python3 and [fdb](https://pypi.python.org/pypi/fdb) for its work. Also, you obviously should have access to firebird server - on the same mashine or somewhere else.
 
 In debian-based systems all the necessary software can be installed by the command
 ```bash
- aptitude install python3 fdb firebird2.5-super
+ apt install python3 fdb firebird3.0-server
 ```
-## Installation
+
+In the case you already have a firebird server configured, you need to install python3 and then you can use `pip` to install additional python package:
+
+```
+pip3 install fdb
+```
 
 After installing requirements script is self-sufficient and does not require any additional setup. You can download it into any suitable location and run using python3 interpreter.
 
@@ -19,6 +24,9 @@ When run without any params or with -h script shows all available options. Typic
 ```bash
  python3 fdbtest.py -d employee -u sysdba -p masterkey -t dir_with_tests -r dir_with_results
 ```
+
+The `examples` directory from this repository contains working set of tests that should be able to run on any Firebird database and provide some initial idea about how to write the tests.
+
 ## Test contents
 
 Every test is described in a separate file in a JSON format with a following structure:
