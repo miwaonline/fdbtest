@@ -184,8 +184,8 @@ class SingleTest:
 
     def StoreRes(self, datastring):
         if opt.cmdargs.results_dir:
-            with open(opt.cmdargs.results_dir + os.sep + self.id + '.log', mode='a', \
-                encoding='utf-8') as f:
+            with open(opt.cmdargs.results_dir + os.sep + self.id + '.log', \
+                        mode='a', encoding='utf-8') as f:
                 f.write(datastring + '\n' + ('=' * 80) + '\n')
 
     def CompareValues(self, received, expected):
@@ -224,29 +224,28 @@ class SingleTest:
                 file_passed = True
                 debug_str += '\nPASSED'
             else:
-                logging.error('Error executing sql script {} with command line {}'.\
-                    format(filename, cmd))
+                log.file.error(f'Error executing sql script {filename} with command line {cmd}')
                 debug_str += '\nFAILED'
         else:
-            debug_str = 'Executing {} via system shell '.format(filename)
+            debug_str = f'Executing {filename} via system shell '
             p = subprocess.Popen(filename, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             res = p.communicate()
             if p.returncode == 0:
                 file_passed = True
                 debug_str += '\nPASSED'
             else:
-                logging.error('Error executing file {} with error {}'.\
-                    format(filename, p.returncode))
-                debug_str += '\nCommand returned error {}'.format(p.returncode)
+                log.file.error(f'Error executing file {filename} with error {p.returncode}')
+                debug_str += f'\nCommand returned error {p.returncode}'
                 debug_str += '\nFAILED'
         self.StoreRes(debug_str)
         return file_passed
 
     def ExecStatement(self, statement, test_vars):
         stmt_passed = False
-        debug_str = yaml.dump(statement, allow_unicode=True)
-        debug_str += '\n\nVariables: ' + \
-            yaml.dump(test_vars, allow_unicode=True)
+        debug_str = '### Statement:\n'
+        debug_str += yaml.dump(statement, allow_unicode=True, sort_keys=False)
+        debug_str += '\n### Variables:\n'
+        debug_str += yaml.dump(test_vars, allow_unicode=True, sort_keys=False)
         #at first fill params with their values
         paramlist = []
         if not statement.get('params') is None:
@@ -275,14 +274,14 @@ class SingleTest:
                     stmt_passed = True
                 else:
                     stmt_passed = False
-            debug_str += '\n\nResults:\n' + ' '.join(str(r) for r in res)
+            debug_str += '\n### Results:\n' + ' '.join(str(r) for r in res)
         else:
             for item in res:
                 #force convert to str because in some cases interpreter tryes
                 #to do smth like Decimal(1.5) and subsequently fails
                 test_vars[item] = str(res.get(item))
             if len(res) > 0:
-                debug_str += '\n\nResults:\n' + str(res)
+                debug_str += '\n### Results:\n' + str(res)
 
             stmt_passed = True
             if statement.get('expect_values'):
@@ -296,19 +295,17 @@ class SingleTest:
                     v2 = statement.get('expect_equals')[i+1]
                     v1 = test_vars[v1.upper()]
                     v2 = test_vars[v2.upper()]
-                    debug_str += '\nComparing values {} and {}'.format(v1, v2)
+                    debug_str += f'\nComparing values {v1} and {v2}'
                     stmt_passed = stmt_passed and self.CompareValues(v1, v2)
         if stmt_passed and statement.get('expect_duration'):
             timelength = timefinish - timestart
             if timelength > float(statement.get('expect_duration')):
                 stmt_passed = False
-                debug_str += '\nTimeout: statement executed {:f} seconds while expected {}'\
-                  .format(timelength, statement.get('expect_duration'))
+                debug_str += f"\nTimeout: statement executed {timelength:f} seconds while expected {statement.get('expect_duration')}."
         if stmt_passed:
             debug_str += '\nPASSED'
         else:
-            logging.error("Error while executing statement: {} with params {}. {}"\
-                .format(statement.get('sql'), paramlist, res))
+            log.file.error(f"Error while executing statement: {statement.get('sql')} with params {paramlist}. {res}")
             debug_str += '\nFAILED'
         self.StoreRes(debug_str)
         return stmt_passed
@@ -343,7 +340,7 @@ class SingleTest:
         if hasattr(self, 'data_files') and not opt.args.no_test_data:
             log.file.info(f'Preparing data for test No{self.id} {self.name}')
             for filename in self.data_files:
-                self.StoreRes('Processing data_file {}'.format(filename))
+                self.StoreRes(f'Processing data_file {filename}')
                 self.ExecFile(filename)
         log.file.info(f'Running test No{self.id} {self.name}')
         if self.RunTest():
