@@ -1,0 +1,20 @@
+# Initial comment before the docstream
+---
+id: "001"
+name: "first test"
+author: "miwaonline"
+description: "A set of queries to show some basic logic"
+test_statements:
+  - sql: "select 1 as t1, 1 as t2, 1 as t3 from rdb$database"
+    expect_values: {"t1": "1"}
+    expect_equals: ["t1", "t2", "t3"]
+  - sql: "select nonexistent_column from nonexistent_table"
+    expect_error_string: "Table unknown"
+  - sql: "select ? from rdb$database"
+    params: ["t1"]
+    expect_error_string: "Data type unknown"
+  - sql: "select cast(? as int) as t4 from rdb$database"
+    params: ["t1"]
+    expect_equals: ["t1", "t4"]
+  - sql: "select 10*10 as t5 from rdb$database"
+    expect_values: { "t5": ">99", "t5": "<101" }

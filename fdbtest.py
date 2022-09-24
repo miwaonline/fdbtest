@@ -1,26 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import os
-import fdb #requires external package
+import fdb  # requires external package
 import logging
 import argparse
-import json
+import yaml # required external package
 import collections
 import subprocess
 import sys
 import time
 
-class Adds:
-    def IsDigit(value):
-        try:
-            float(value)
-            return True
-        except ValueError:
-            return False
+opt = 0
+log = 0
+fb = 0
 
-class TestOptions:
+class FBTOptions:
     """
-    Place to share all common/global options
+    Place to share all common/global options including passed via command line
     """
     def __init__(self):
         """
@@ -60,26 +56,139 @@ class TestOptions:
             help='directory to store detailed information about executing tests')
         parser.add_argument('-f', '--force_clean', action="store_true",\
             help='remove .log files from directory with results before executing tests')
-        TestOptions.args = parser.parse_args()
+        self.cmdargs = parser.parse_args()
+        # now set proper gbak and isql values
+        if self.cmdargs.gbak == '':
+            if os.name == 'posix':
+                self.cmdargs.gbak = 'gbak'
+            else:
+                self.cmdargs.gbak = 'gbak.exe'
+        if self.cmdargs.isql == '':
+            if os.name == 'posix':
+                self.cmdargs.isql = 'isql-fb'
+            else:
+                self.cmdargs.isql = 'isql.exe'
+
+class FBTLog:
+    """
+    Place to keep loggging
+    """
+    def __init__(self, opt):
+        if sys.stdout.isatty():
+            formatter = logging.Formatter(fmt='%(asctime)s %(message)s', datefmt='%H:%M:%S')
+            handler = logging.StreamHandler()
+            handler.setFormatter(formatter)
+            logstd = logging.getLogger('stdout')
+            logstd.setLevel(logging.INFO)
+            logstd.addHandler(handler)
+        else:
+            logstd = logging.getLogger('dummy')
+
+        if opt.cmdargs.results_dir:
+            if opt.cmdargs.force_clean and os.path.exists(opt.cmdargs.results_dir):
+                for file in os.scandir(opt.cmdargs.results_dir):
+                    if file.name.endswith(".log"):
+                        os.remove(file.path)
+            if not os.path.exists(opt.cmdargs.results_dir):
+                os.makedirs(opt.cmdargs.results_dir)
+            logfilename=opt.cmdargs.results_dir + os.sep + 'fdbtest.log'
+        else:
+            logfilename='logfile.log'
+
+        formatter = logging.Formatter(fmt='%(asctime)s %(levelname)s %(message)s',
+                    datefmt='%Y/%m/%d %H:%M:%S')
+        handler = logging.FileHandler(logfilename)
+        handler.setFormatter(formatter)
+        logfile = logging.getLogger('logfile')
+        logfile.setLevel(logging.INFO)
+        logfile.addHandler(handler)
+
+        self.stdout = logstd
+        self.file = logfile
+
+class Firebird:
+    """
+    Implements database processing
+    """
+    def __init__(self):
+        """
+        Initializing default connection params
+        """
+        self.username = 'SYSDBA'
+        self.password = 'masterkey'
+        self.database = 'employee'
+        self.host = '127.0.0.1'
+        self.port = 3050
+        self.charset = 'UTF8'
+
+    def Connect(self, database, username='SYSDBA', password='masterkey', \
+            host='127.0.0.1', port=3050, charset='UTF8'):
+        """
+        Connect to database with the params provided
+        """
+        self.username = username
+        self.password = password
+        self.database = database
+        self.host = host
+        self.port = port
+        self.charset = charset
+        self.db = fdb.connect(user=self.username, password=self.password, \
+                  host=self.host, port=self.port, \
+                  database=self.database, charset=self.charset)
+
+    def Execute(self, statement, params=None):
+        """
+        Executes statement and returns dict with corresponding values or tulip with
+        error information (error string, deprecated sql error code, gds error code)
+        """
+        cur = self.db.cursor()
+        try:
+            cur.execute(statement, params)
+            res = cur.fetchonemap()
+            cur.transaction.commit()
+        except fdb.Error as fdberror:
+            if fdberror.args[0] == 'Attempt to fetch row of results after statement that does not produce result set.':
+                cur.transaction.commit()
+                cur.close()
+                res = dict()
+            else:
+                cur.transaction.rollback()
+                cur.close()
+                res = fdberror.args
+        except:
+            cur.transaction.rollback()
+            cur.close()
+            res = fdberror.args
+        finally:
+            return res
+
+class Adds:
+    def IsDigit(value):
+        try:
+            float(value)
+            return True
+        except ValueError:
+            return False
 
 class SingleTest:
     """
-    Here all magic will be placed
+    Processes a single test file
     """
     def __init__(self, filename):
         """
-        Create all the necessary from given filename
+        Create the necessary object from given yaml
         """
         with open(filename, mode='r', encoding='utf-8') as f:
-            self.__dict__ = json.load(f, object_pairs_hook=collections.OrderedDict)
+            #self.fullYaml = yaml.safe_load(f)
+            self.__dict__ = yaml.safe_load(f)
 
     def StoreRes(self, datastring):
-        if TestOptions.args.results_dir:
-            with open(TestOptions.args.results_dir + os.sep + self.id + '.log', mode='a', \
+        if opt.cmdargs.results_dir:
+            with open(opt.cmdargs.results_dir + os.sep + self.id + '.log', mode='a', \
                 encoding='utf-8') as f:
                 f.write(datastring + '\n' + ('=' * 80) + '\n')
 
-    def CompareValues(self, received, expected):        
+    def CompareValues(self, received, expected):
         if Adds.IsDigit(expected) and Adds.IsDigit(received):
             return float(received) == float(expected)
         elif (expected[:1] == '>') \
@@ -133,12 +242,11 @@ class SingleTest:
         self.StoreRes(debug_str)
         return file_passed
 
-    def ExecStatement(self, db, statement, test_vars):
+    def ExecStatement(self, statement, test_vars):
         stmt_passed = False
-        debug_str = json.dumps(statement, indent=2, \
-            default=lambda o: o.__dict__, ensure_ascii=False)
+        debug_str = yaml.dump(statement, allow_unicode=True)
         debug_str += '\n\nVariables: ' + \
-            json.dumps(test_vars, default=lambda o: o.__dict__, ensure_ascii=False)
+            yaml.dump(test_vars, allow_unicode=True)
         #at first fill params with their values
         paramlist = []
         if not statement.get('params') is None:
@@ -147,9 +255,9 @@ class SingleTest:
         #execute statement and measure execution time
         timestart = time.time()
         if type(statement.get('sql')) is list:
-            res = db.Execute(" ".join(statement.get('sql')), paramlist)
+            res = fb.Execute(" ".join(statement.get('sql')), paramlist)
         else:
-            res = db.Execute(statement.get('sql'), paramlist)
+            res = fb.Execute(statement.get('sql'), paramlist)
         timefinish = time.time()
         #tuple with 3 items is standart fb error with items "errorstring",
         #deprecated "sqlcode" and "gdscode"; so we check both "expect_error_string"
@@ -205,7 +313,7 @@ class SingleTest:
         self.StoreRes(debug_str)
         return stmt_passed
 
-    def RunTest(self, db):
+    def RunTest(self):
         """
         Running main test files and statements
         """
@@ -218,142 +326,68 @@ class SingleTest:
         if hasattr(self, 'test_statements'):
             self.StoreRes('Processing test statements')
             for statement in self.test_statements:
-                test_passed = test_passed and self.ExecStatement(db, statement, test_vars)
+                test_passed = test_passed and self.ExecStatement(statement, test_vars)
         return test_passed
 
-    def RunFulltest(self, db):
+    def RunFulltest(self):
         """
         Running all test routines
         """
-        self.StoreRes(json.dumps(self.__dict__, indent=2, \
-            default=lambda o: o.__dict__, ensure_ascii=False))
+        global log
+        reset = "\x1b[0m"
+        red = "\x1b[31;20m"
+        grey = "\x1b[38;20m"
+        yellow = "\x1b[33;20m"
+        green = "\x1b[32;20m"
+        #self.StoreRes(self.__dics__)
         if hasattr(self, 'data_files') and not opt.args.no_test_data:
-            logging.info("Preparing data for test No{} '{}'".format(self.id, self.name))
+            log.file.info(f'Preparing data for test No{self.id} {self.name}')
             for filename in self.data_files:
                 self.StoreRes('Processing data_file {}'.format(filename))
                 self.ExecFile(filename)
-        logging.info("Running test No{} '{}'".format(self.id, self.name))
-        if self.RunTest(db):
-            print(f'Passed: {self.id}, {self.name}')
-            logging.info("Passed")
+        log.file.info(f'Running test No{self.id} {self.name}')
+        if self.RunTest():
+            log.stdout.info(f'{green}Passed{reset}: {self.id}, {self.name}')
+            log.file.info(f'Passed: {self.id}, {self.name}')
         else:
-            print(f'Failed: {self.id}, {self.name}')
-            logging.info("Failed")
-
-class Firebird:
-    """
-    Realises work with database
-    """
-    def __init__(self):
-        """
-        Initializing default connection params
-        """
-        self.username = 'SYSDBA'
-        self.password = 'masterkey'
-        self.database = 'employee'
-        self.host = '127.0.0.1'
-        self.port = 3050
-        self.charset = 'UTF8'
-
-    def Connect(self, database, username='SYSDBA', password='masterkey', \
-            host='127.0.0.1', port=3050, charset='UTF8'):
-        """
-        Connect to database with given params
-        """
-        self.username = username
-        self.password = password
-        self.database = database
-        self.host = host
-        self.port = port
-        self.charset = charset
-        self.db = fdb.connect(user=self.username, password=self.password, \
-                  host=self.host, port=self.port, \
-                  database=self.database, charset=self.charset)
-
-    def Execute(self, statement, params=None):
-        """
-        Executes statement and returns dict with corresponding values or tulip with
-        error information (error string, deprecated sql error code, gds error code)
-        """
-        cur = self.db.cursor()
-        try:
-            cur.execute(statement, params)
-            res = cur.fetchonemap()
-            cur.transaction.commit()
-        except fdb.Error as fdberror:
-            if fdberror.args[0] == 'Attempt to fetch row of results after statement that does not produce result set.':
-                cur.transaction.commit()
-                cur.close()
-                res = dict()
-            else:
-                cur.transaction.rollback()
-                cur.close()
-                res = fdberror.args
-        except:
-            cur.transaction.rollback()
-            cur.close()
-            res = fdberror.args
-        finally:
-            return res
+            log.stdout.info(f'{red}Failed{reset}: {self.id}, {self.name}')
+            log.file.info(f'Failed: {self.id}, {self.name}')
 
 def main():
-    opt = TestOptions()
-    if opt.args.results_dir:
-        if opt.args.force_clean and os.path.exists(opt.args.results_dir):
-            for file in os.scandir(opt.args.results_dir):
-                if file.name.endswith(".log"):
-                    os.remove(file.path)
-        if not os.path.exists(opt.args.results_dir):
-            os.makedirs(opt.args.results_dir)
-        logging.basicConfig(filename=opt.args.results_dir + os.sep + 'logfile.log',\
-            level=logging.INFO, \
-            format='%(asctime)s %(levelname)s %(message)s', \
-            datefmt='%Y/%m/%d %H:%M:%S')
-    else:
-        logging.basicConfig(filename='logfile.log',\
-            level=logging.INFO, \
-            format='%(asctime)s %(levelname)s %(message)s', \
-            datefmt='%Y/%m/%d %H:%M:%S')
-
-    if opt.args.use_backup:
-        if opt.args.gbak == '':
-            if os.name == 'posix':
-                opt.args.gbak = 'gbak'
-            else:
-                opt.args.gbak = 'gbak.exe'
-        cmd = [opt.args.gbak, '-rep', '-user', opt.args.username, \
-            '-pass', opt.args.password, opt.args.use_backup, \
-            opt.args.server + '/' + opt.args.port + ':' + opt.args.database]
+    global log
+    global opt
+    global fb
+    opt = FBTOptions()
+    log = FBTLog(opt)
+    log.file.info(f'Script invoked with {str(opt.cmdargs)}')
+    if opt.cmdargs.use_backup:
+        log.file.info(f'Restoring database {opt.cmdargs.database} from backup file {opt.cmdargs.use_backup}')
+        cmd = [opt.cmdargs.gbak, '-rep', '-user', opt.cmdargs.username, \
+            '-pass', opt.cmdargs.password, opt.cmdargs.use_backup, \
+            opt.cmdargs.server + '/' + opt.cmdargs.port + ':' + opt.cmdargs.database]
         p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,\
                 universal_newlines=True)
         res = p.communicate()
         if p.returncode != 0:
-            logging.error('Error restoring backup {} to database {}'.
-                format(opt.args.use_backup, opt.args.database))
-            sys.exit(1)
-
-    if opt.args.isql == '':
-        if os.name == 'posix':
-            opt.args.isql = 'isql-fb'
-        else:
-            opt.args.isql = 'isql.exe'
-    
+            log.file.error(f'Error restoring backup {opt.cmdargs.use_backup} to database {opt.cmdargs.database}')
+            sys.exit(1)    
     fb = Firebird()
-    fb.Connect(opt.args.database, opt.args.username, opt.args.password, \
-        opt.args.server, opt.args.port)
+    log.file.info(f'Connect to {opt.cmdargs.server}:{opt.cmdargs.database}')
+    fb.Connect(opt.cmdargs.database, opt.cmdargs.username, opt.cmdargs.password, \
+        opt.cmdargs.server, opt.cmdargs.port)
 
-    if os.path.isdir(opt.args.run_test):
-        for filename in sorted(os.listdir(opt.args.run_test)):
+    if os.path.isdir(opt.cmdargs.run_test):
+        for filename in sorted(os.listdir(opt.cmdargs.run_test)):
             ext = os.path.splitext(filename)[1]
-            if ext == '.fbt':
-                atest = SingleTest(opt.args.run_test + os.sep + filename)
-                atest.RunFulltest(fb)
-    elif os.path.isfile(opt.args.run_test):
-        atest = SingleTest(opt.args.run_test)
-        atest.RunFulltest(fb)
+            if ext in ('.yaml', '.yml'):
+                atest = SingleTest(opt.cmdargs.run_test + os.sep + filename)
+                atest.RunFulltest()
+    elif os.path.isfile(opt.cmdargs.run_test):
+        atest = SingleTest(opt.cmdargs.run_test)
+        atest.RunFulltest()
     else:
         print("{} is neither file nor dir so nothing to run".
-            format(opt.args.run_test))
+            format(opt.cmdargs.run_test))
 
 if __name__ == '__main__':
     main()

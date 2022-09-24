@@ -1,0 +1,27 @@
+# Перший тест
+---
+id: "001"
+name: "Перевірка базових налаштувань"
+author: "miwaonline"
+description: "Перевіряємо, що у таблиці S_SETTINGS є всі необхідні параметри"
+test_statements:
+  -
+    sql: "select count(*) as t1 from s_settings
+          where key_name = 'STARTWORKDATE'"
+    expect_values:
+      t1: "1"
+  -
+    sql: "select count(*) as t1 from s_settings
+          where key_name = 'STOPWORKDATE'"
+    expect_values:
+      t1: "1"
+  -
+    sql: "select count(*) as t1 from s_settings
+          where key_name = 'ALLOW_ROLLBACK_CHECK'"
+    expect_values:
+      t1: "1"
+  -
+    sql: "select count(*) as t1 from s_settings
+          where key_name = 'DISALLOW_SALE_DOWNCOST'"
+    expect_values:
+      t1: "1"

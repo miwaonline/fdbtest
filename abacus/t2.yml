@@ -1,0 +1,49 @@
+# Другий тест
+---
+id: "002"
+name: "Перевірка базової логіки прихідних накладних"
+author: "miwaonline"
+description: "Робочий період, співпадіння сум, відкриті-закриті документи"
+test_statements:
+  - sql: "update s_settings set key_value = dateadd(-1 day to current_date)
+          where key_name = 'STARTWORKDATE'"
+  - sql: "update s_settings set key_value = dateadd(1 day to current_date)
+          where key_name = 'STOPWORKDATE'"
+  - sql: "select first 1 id as operator_id from r_workers where rights = 4"
+  - sql: "insert into vw_inc_delivery(doc_date,operator)
+          values(dateadd(2 day to current_date), ?)"
+    params: ["operator_id"]
+    expect_error_string: "поза робочим періодом"
+  - sql: "insert into vw_inc_delivery(doc_date,operator)
+          values(current_date, -10000)"
+    expect_error_gdscode: "335544466"
+  - sql: "insert into inc_delivery(doc_date,operator)
+          values(current_date, ?) returning id as delivery_id"
+    params: ["operator_id"]
+  - sql: "insert into inc_deliverybody(delivery_id, tovar_id, ext_ean13)
+            select first 3 ?, tovar_id, tovar_code from c_aggrtovar
+            where tovar_id is not null and tovar_code is not null"
+    params: ["delivery_id"]
+  - sql: "update inc_delivery set commited = 1 where id = ?"
+    params: ["delivery_id"]
+  - sql: "insert into inc_deliverybody(delivery_id, tovar_id, ext_ean13)
+          select first 1 ?, tovar_id, tovar_code from c_aggrtovar
+          where tovar_id is not null and tovar_code is not null"
+    params: ["delivery_id"]
+    expect_error_string: "Не можна міняти проведений документ"
+  - sql: "select sum(b.amount * b.price) as s1, d.price as s2
+          from inc_deliverybody b, inc_delivery d
+          where b.delivery_id = d.id and d.id = ? and b.deleted = 0 group by 2"
+    params: ["delivery_id"]
+    expect_equals: ["s1", "s2"]
+  - sql: "select sum(b.amount * b.sell_price) as s1, d.s_summ as s2
+          from inc_deliverybody b, inc_delivery d
+          where b.delivery_id = d.id and d.id = ? and b.deleted = 0 group by 2"
+    params: ["delivery_id"]
+    expect_equals: ["s1", "s2"]
+  - sql: "update inc_deliverybody set deleted = 1 where delivery_id = ?"
+    params: ["delivery_id"]
+    expect_error_string: "Не можна міняти проведений документ"
+  - sql: "update inc_deliverybody set amount = 10 where delivery_id = ?"
+    params: ["delivery_id"]
+    expect_error_string: "Не можна міняти проведений документ"
