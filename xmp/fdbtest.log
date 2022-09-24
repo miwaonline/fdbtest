@@ -1,6 +1,0 @@
-2022/09/24 19:45:37 INFO Script invoked with Namespace(database='localtest1', force_clean=False, gbak='gbak', isql='isql-fb', no_test_data=False, password='masterkey', port=3050, results_dir='xmp', run_test='abacus/', server='127.0.0.1', use_backup=None, username='SYSDBA')
-2022/09/24 19:45:37 INFO Connect to 127.0.0.1:localtest1
-2022/09/24 19:45:37 INFO Running test No001 Перевірка базових налаштувань
-2022/09/24 19:45:37 INFO Passed: 001, Перевірка базових налаштувань
-2022/09/24 19:45:37 INFO Running test No002 Перевірка базової логіки прихідних накладних
-2022/09/24 19:45:37 INFO Passed: 002, Перевірка базової логіки прихідних накладних
