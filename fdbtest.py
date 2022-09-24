@@ -234,10 +234,10 @@ class SingleTest:
                 self.ExecFile(filename)
         logging.info("Running test No{} '{}'".format(self.id, self.name))
         if self.RunTest(db):
-            print('Passed:', self.name)
+            print(f'Passed: {self.id}, {self.name}')
             logging.info("Passed")
         else:
-            print('Failed:', self.name)
+            print(f'Failed: {self.id}, {self.name}')
             logging.info("Failed")
 
 class Firebird:
