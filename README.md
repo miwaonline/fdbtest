@@ -49,11 +49,11 @@ test_statements":
 
 Items "id", "name", "author" and "description" are using just for idenifying a test and may contain any suitable information. Keep in mind, however, that in dir with results (if set) log files are created as "id".log.
 
-"data_files" can be used for fullfilling (empty "golden") database with some testing data. Their executing can also be skipped with an option -n (-no_test_data) 
+"data_files" can be used for fullfilling (empty "golden") database with some testing data. Their executing can also be skipped with an option -n (-no_test_data) to address the case when a test usually requires some data but in the particular scenario the data already persist in the testing database.
 
 "test_files" - some external scripts that can be used for testing. If set, they are executed in given order and expected to be finished with status code 0.
 
-Files from both sections are running with firebird isql tool if they have .sql extension (you can also point out any particular binary through "-i" command line switch) and directly otherwise. This means that if you need to run some scripts during the test, you should have rights to execute them in your system.
+Files from both sections are executed by the firebird `isql` tool if they have .sql extension (you can also point out any particular binary through "-i" command line switch) and directly otherwise. This means that if you need to run some scripts during the test, you should have rights to execute them in your system.
 
 "test_statements" is the core of testing tool. They consists of unlimited number of sections with the following items
 
@@ -64,6 +64,10 @@ Files from both sections are running with firebird isql tool if they have .sql e
  * "expect_error_string" - string, that expected to be contained in raised error message. Test is considered as passed if error occured with appropriate message and failed in other case
  * "expect_duration" - floating number of seconds. Test is considered as failed if statement was executed longer that given number.
  * "params" - name of variables that will be used in the statement
+
+For any test, all the items are optional, i.e. a test with only, lets say, `test_files` section is completely legit. Again, keep in mind, that if you provided `result_dir` command line switch, `id` has to be set.
+
+For `test_statements` section, `sql` item is compulsory, all other items are optional.
 
 ### Variables
 After executing every statement all results are stored with their corresponding names and can be used in subsequent statements for comparison or as a params. Lets look at the following example:
