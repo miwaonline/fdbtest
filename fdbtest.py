@@ -252,12 +252,12 @@ class SingleTest:
             for param in statement.get('params'):
                 paramlist.append(test_vars[param.upper()])
         #execute statement and measure execution time
-        timestart = time.time()
+        timestart = time.perf_counter()
         if type(statement.get('sql')) is list:
             res = fb.Execute(" ".join(statement.get('sql')), paramlist)
         else:
             res = fb.Execute(statement.get('sql'), paramlist)
-        timefinish = time.time()
+        timefinish = time.perf_counter()
         #tuple with 3 items is standart fb error with items "errorstring",
         #deprecated "sqlcode" and "gdscode"; so we check both "expect_error_string"
         #and "expect_error_gdscode" (if set) to pass the test
@@ -383,8 +383,8 @@ def main():
         atest = SingleTest(opt.cmdargs.run_test)
         atest.RunFulltest()
     else:
-        print("{} is neither file nor dir so nothing to run".
-            format(opt.cmdargs.run_test))
+        log.stdout.error(f"{opt.cmdargs.run_test} is neither file nor dir so nothing to run")
+        log.file.error(f"{opt.cmdargs.run_test} is neither file nor dir so nothing to run")
 
 if __name__ == '__main__':
     main()

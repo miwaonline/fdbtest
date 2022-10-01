@@ -21,9 +21,10 @@ test_statements:
           values(current_date, ?) returning id as delivery_id"
     params: ["operator_id"]
   - sql: "insert into inc_deliverybody(delivery_id, tovar_id, ext_ean13)
-            select first 3 ?, tovar_id, tovar_code from c_aggrtovar
+            select first 10 ?, tovar_id, tovar_code from c_aggrtovar
             where tovar_id is not null and tovar_code is not null"
     params: ["delivery_id"]
+    expect_duration: 1.0
   - sql: "update inc_delivery set commited = 1 where id = ?"
     params: ["delivery_id"]
   - sql: "insert into inc_deliverybody(delivery_id, tovar_id, ext_ean13)
