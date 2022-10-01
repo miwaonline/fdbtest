@@ -93,7 +93,7 @@ class FBTLog:
                 os.makedirs(opt.cmdargs.results_dir)
             logfilename=opt.cmdargs.results_dir + os.sep + 'fdbtest.log'
         else:
-            logfilename='logfile.log'
+            logfilename='fdbtest.log'
 
         formatter = logging.Formatter(fmt='%(asctime)s %(levelname)s %(message)s',
                     datefmt='%Y/%m/%d %H:%M:%S')
@@ -342,7 +342,7 @@ class SingleTest:
             for filename in self.data_files:
                 self.StoreRes(f'Processing data_file {filename}')
                 self.ExecFile(filename)
-        log.file.info(f'Running test No{self.id} {self.name}')
+        log.file.info(f'Running test No {self.id} {self.name}')
         if self.RunTest():
             log.stdout.info(f'{green}Passed{reset}: {self.id}, {self.name}')
             log.file.info(f'Passed: {self.id}, {self.name}')
