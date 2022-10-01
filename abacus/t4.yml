@@ -1,0 +1,59 @@
+# Другий тест
+---
+id: "004"
+name: "Перевірка базової логіки товарних чеків"
+author: "miwaonline"
+description: "Робочий період, співпадіння сум, відкриті-закриті документи"
+test_statements:
+  - sql: "update s_settings set key_value = dateadd(-1 day to current_date)
+          where key_name = 'STARTWORKDATE'"
+  - sql: "update s_settings set key_value = dateadd(1 day to current_date)
+          where key_name = 'STOPWORKDATE'"
+  - sql: "select first 1 id as operator_id from r_workers where rights = 4"
+  - sql: "insert into vw_out_check(doc_date,operator)
+          values(dateadd(2 day to current_date), ?)"
+    params: ["operator_id"]
+    expect_error_string: "поза робочим періодом"
+  - sql: "insert into vw_out_check(doc_date,operator)
+          values(current_date, -10000)"
+    expect_error_gdscode: "335544466"
+  - sql: "insert into out_check(doc_date,operator)
+          values(current_date, ?) returning id as check_id"
+    params: ["operator_id"]
+  - sql: "insert into out_checkbody(check_id, tovar_id, tovar_code)
+            select first 10 ?, tovar_id, tovar_code from c_aggrtovar
+            where tovar_id is not null and tovar_code is not null"
+    params: ["check_id"]
+    expect_duration: 1.0
+  - sql: "update out_check set commited = 1 where id = ?"
+    params: ["check_id"]
+  - sql: "insert into out_checkbody(check_id, tovar_id, tovar_code)
+          select first 1 ?, tovar_id, tovar_code from c_aggrtovar
+          where tovar_id is not null and tovar_code is not null"
+    params: ["check_id"]
+    expect_error_string: "Не можна міняти проведений документ"
+  - sql: "select sum(b.amount * b.inc_price) as s1, d.inc_summ as s2
+          from out_checkbody b, out_check d
+          where b.check_id = d.id and d.id = ? and b.deleted = 0 group by 2"
+    params: ["check_id"]
+    expect_equals: ["s1", "s2"]
+  - sql: "select sum(b.amount * b.sll_price) as s1, d.sll_summ as s2
+          from out_checkbody b, out_check d
+          where b.check_id = d.id and d.id = ? and b.deleted = 0 group by 2"
+    params: ["check_id"]
+    expect_equals: ["s1", "s2"]
+  - sql: "update out_checkbody set deleted = 1 where check_id = ?"
+    params: ["check_id"]
+    expect_error_string: "Не можна міняти проведений документ"
+  - sql: "update out_checkbody set amount = 10 where check_id = ?"
+    params: ["check_id"]
+    expect_error_string: "Не можна міняти проведений документ"
+  - sql: "select count(id) as mdoccount from m_docum where doc_id = ? and doc_type = 3"
+    params: ["check_id"]
+    expect_values:
+      mdoccount: 1
+  - sql: "select count(id) as mtovcount from m_tovar where doc_id = ? and doc_type = 3"
+    params: ["check_id"]
+  - sql: "select count(id) as bodycount from out_checkbody where check_id = ? and deleted = 0"
+    params: ["check_id"]
+    expect_equals: ["mtovcount", "bodycount"]
