@@ -29,9 +29,7 @@ class FBTOptions:
             default="127.0.0.1",
         )
         parser.add_argument(
-            "--port",
-            help="server port (default 3050)",
-            default=3050
+            "--port", help="server port (default 3050)", default=3050
         )
         parser.add_argument(
             "-d",
@@ -52,9 +50,7 @@ class FBTOptions:
             default="masterkey",
         )
         parser.add_argument(
-            "-b",
-            "--use_backup",
-            help="restore given backup file for testing"
+            "-b", "--use_backup", help="restore given backup file for testing"
         )
         parser.add_argument(
             "-n",
@@ -72,29 +68,37 @@ class FBTOptions:
         parser.add_argument(
             "-i",
             "--isql",
-            help=('isql binary (default is "isql-fb" for linux'
-                  ' and "isql.exe" for windows)'),
+            help=(
+                'isql binary (default is "isql-fb" for linux'
+                ' and "isql.exe" for windows)'
+            ),
             default="",
         )
         parser.add_argument(
             "-g",
             "--gbak",
-            help=('gbak binary (default is "gbak" for linux'
-                  ' and "gbak.exe" for windows)'),
+            help=(
+                'gbak binary (default is "gbak" for linux'
+                ' and "gbak.exe" for windows)'
+            ),
             default="",
         )
         parser.add_argument(
             "-r",
             "--results_dir",
-            help=("directory to store detailed information about"
-                  " executing tests"),
+            help=(
+                "directory to store detailed information about"
+                " executing tests"
+            ),
         )
         parser.add_argument(
             "-f",
             "--force_clean",
             action="store_true",
-            help=("remove .log files from directory with results"
-                  " before executing tests"),
+            help=(
+                "remove .log files from directory with results"
+                " before executing tests"
+            ),
         )
         self.cmdargs = parser.parse_args()
         # now set proper gbak and isql values
@@ -129,7 +133,9 @@ class FBTLog:
             logstd = logging.getLogger("dummy")
 
         if opt.cmdargs.results_dir:
-            if opt.cmdargs.force_clean and os.path.exists(opt.cmdargs.results_dir):
+            if opt.cmdargs.force_clean and os.path.exists(
+                opt.cmdargs.results_dir
+            ):
                 for file in os.scandir(opt.cmdargs.results_dir):
                     if file.name.endswith(".log"):
                         os.remove(file.path)
@@ -140,7 +146,8 @@ class FBTLog:
             logfilename = "fdbtest.log"
 
         formatter = logging.Formatter(
-            fmt="%(asctime)s %(levelname)s %(message)s", datefmt="%Y/%m/%d %H:%M:%S"
+            fmt="%(asctime)s %(levelname)s %(message)s",
+            datefmt="%Y/%m/%d %H:%M:%S",
         )
         handler = logging.FileHandler(logfilename)
         handler.setFormatter(formatter)
@@ -201,15 +208,16 @@ class Firebird:
         error information (error string, deprecated sql error code, gds error code)
         """
         cur = self.db.cursor()
+        noresset = (
+            "Attempt to fetch row of results after statement that does"
+            " not produce result set."
+        )
         try:
             cur.execute(statement, params)
             res = cur.fetchonemap()
             cur.transaction.commit()
         except fdb.Error as fdberror:
-            if (
-                fdberror.args[0]
-                == "Attempt to fetch row of results after statement that does not produce result set."
-            ):
+            if fdberror.args[0] == noresset:
                 cur.transaction.commit()
                 cur.close()
                 res = dict()
@@ -286,7 +294,7 @@ class SingleTest:
         if ext == ".sql":
             cmd = [
                 opt.args.isql,
-                opt.args.server + "/" + opt.args.port + ":" + opt.args.database,
+                f"{opt.args.server}/{opt.args.port}:{opt.args.database}",
                 "-u",
                 opt.args.username,
                 "-pas",
@@ -296,8 +304,9 @@ class SingleTest:
                 "-m",
                 "-e",
             ]
-            debug_str = "Exexuting sql script using following command:\n" + " ".join(
-                cmd
+            debug_str = (
+                "Exexuting sql script using following command:\n"
+                + " ".join(cmd)
             )
             p = subprocess.Popen(
                 cmd,
@@ -335,77 +344,134 @@ class SingleTest:
 
     def ExecStatement(self, statement, test_vars):
         stmt_passed = False
+        debug_str = self._prepare_debug_str(statement, test_vars)
+
+        # Fill parameters with their values
+        paramlist = self._prepare_param_list(statement, test_vars)
+
+        # Execute statement and measure execution time
+        timestart = time.perf_counter()
+        res = self._execute_statement(statement, paramlist)
+        timefinish = time.perf_counter()
+
+        # Check the results
+        stmt_passed, debug_str = self._check_results(
+            statement,
+            res,
+            test_vars,
+            debug_str,
+            timestart,
+            timefinish,
+            paramlist,
+        )
+
+        # Store and return results
+        self.StoreRes(debug_str)
+        return stmt_passed
+
+    def _prepare_debug_str(self, statement, test_vars):
         debug_str = "### Statement:\n"
         debug_str += yaml.dump(statement, allow_unicode=True, sort_keys=False)
         debug_str += "\n### Variables:\n"
         debug_str += yaml.dump(test_vars, allow_unicode=True, sort_keys=False)
-        # at first fill params with their values
+        return debug_str
+
+    def _prepare_param_list(self, statement, test_vars):
         paramlist = []
-        if not statement.get("params") is None:
+        if statement.get("params"):
             for param in statement.get("params"):
                 paramlist.append(test_vars[param.upper()])
-        # execute statement and measure execution time
-        timestart = time.perf_counter()
+        return paramlist
+
+    def _execute_statement(self, statement, paramlist):
         if type(statement.get("sql")) is list:
             res = fb.Execute(" ".join(statement.get("sql")), paramlist)
         else:
             res = fb.Execute(statement.get("sql"), paramlist)
-        timefinish = time.perf_counter()
-        # tuple with 3 items is standart fb error with items "errorstring",
-        # deprecated "sqlcode" and "gdscode"; so we check both "expect_error_string"
-        # and "expect_error_gdscode" (if set) to pass the test
+        return res
+
+    def _check_results(
+        self,
+        statement,
+        res,
+        test_vars,
+        debug_str,
+        timestart,
+        timefinish,
+        paramlist,
+    ):
+        stmt_passed = True
         if type(res) is tuple and len(res) == 3:
-            stmt_passed = False
-            subtest_failed = False
-            if not statement.get("expect_error_gdscode") is None:
-                if str(res[2]) == statement.get("expect_error_gdscode"):
-                    stmt_passed = True
-                else:
-                    subtest_failed = True
-            if not subtest_failed and not statement.get("expect_error_string") is None:
-                if str(res[0]).find(statement.get("expect_error_string")) > -1:
-                    stmt_passed = True
-                else:
-                    stmt_passed = False
+            stmt_passed = self._handle_error(statement, res)
             debug_str += "\n### Results:\n" + " ".join(str(r) for r in res)
         else:
-            for item in res:
-                # force convert to str because in some cases interpreter tryes
-                # to do smth like Decimal(1.5) and subsequently fails
-                test_vars[item] = str(res.get(item))
-            if len(res) > 0:
-                debug_str += "\n### Results:\n" + str(res)
+            stmt_passed = self._handle_success(statement, res, test_vars)
+            debug_str += "\n### Results:\n" + str(res)
 
-            stmt_passed = True
-            if statement.get("expect_values"):
-                for exp in statement.get("expect_values"):
-                    exp_value = statement.get("expect_values")[exp]
-                    res_value = str(test_vars[exp.upper()])
-                    stmt_passed = stmt_passed and self.CompareValues(
-                        res_value, exp_value
-                    )
-            if stmt_passed and statement.get("expect_equals"):
-                for i in range(len(statement.get("expect_equals")) - 1):
-                    v1 = statement.get("expect_equals")[i]
-                    v2 = statement.get("expect_equals")[i + 1]
-                    v1 = test_vars[v1.upper()]
-                    v2 = test_vars[v2.upper()]
-                    debug_str += f"\nComparing values {v1} and {v2}"
-                    stmt_passed = stmt_passed and self.CompareValues(v1, v2)
         if stmt_passed and statement.get("expect_duration"):
-            timelength = timefinish - timestart
-            if timelength > float(statement.get("expect_duration")):
-                stmt_passed = False
-                debug_str += f"\nTimeout: statement executed {timelength:f} seconds while expected {statement.get('expect_duration')}."
+            stmt_passed, debug_str = self._check_duration(
+                statement, timestart, timefinish, debug_str
+            )
+
         if stmt_passed:
             debug_str += "\nPASSED"
         else:
-            log.file.error(
-                f"Error while executing statement: {statement.get('sql')} with params {paramlist}. {res}"
-            )
             debug_str += "\nFAILED"
-        self.StoreRes(debug_str)
+            log.file.error(
+                f"Error while executing statement: {statement.get('sql')} with"
+                f" params {paramlist}. {res}"
+            )
+
+        return stmt_passed, debug_str
+
+    def _handle_error(self, statement, res):
+        stmt_passed = False
+        subtest_failed = False
+        if statement.get("expect_error_gdscode"):
+            if str(res[2]) == statement.get("expect_error_gdscode"):
+                stmt_passed = True
+            else:
+                subtest_failed = True
+        if not subtest_failed and statement.get("expect_error_string"):
+            if str(res[0]).find(statement.get("expect_error_string")) > -1:
+                stmt_passed = True
+            else:
+                stmt_passed = False
         return stmt_passed
+
+    def _handle_success(self, statement, res, test_vars):
+        stmt_passed = True
+        for item in res:
+            test_vars[item] = str(res.get(item))
+
+        if statement.get("expect_values"):
+            for exp in statement.get("expect_values"):
+                exp_value = statement.get("expect_values")[exp]
+                res_value = str(test_vars[exp.upper()])
+                stmt_passed = stmt_passed and self.CompareValues(
+                    res_value, exp_value
+                )
+
+        if stmt_passed and statement.get("expect_equals"):
+            for i in range(len(statement.get("expect_equals")) - 1):
+                v1 = statement.get("expect_equals")[i]
+                v2 = statement.get("expect_equals")[i + 1]
+                v1 = test_vars[v1.upper()]
+                v2 = test_vars[v2.upper()]
+                stmt_passed = stmt_passed and self.CompareValues(v1, v2)
+
+        return stmt_passed
+
+    def _check_duration(self, statement, timestart, timefinish, debug_str):
+        stmt_passed = True
+        timelength = timefinish - timestart
+        if timelength > float(statement.get("expect_duration")):
+            stmt_passed = False
+            debug_str += (
+                f"\nTimeout: statement executed {timelength:f} seconds"
+                f"while expected {statement.get('expect_duration')}."
+            )
+        return stmt_passed, debug_str
 
     def RunTest(self):
         """
@@ -420,7 +486,9 @@ class SingleTest:
         if hasattr(self, "test_statements"):
             self.StoreRes("Processing test statements")
             for statement in self.test_statements:
-                test_passed = test_passed and self.ExecStatement(statement, test_vars)
+                test_passed = test_passed and self.ExecStatement(
+                    statement, test_vars
+                )
         return test_passed
 
     def RunFulltest(self):
@@ -467,15 +535,23 @@ def main():
             "-pass",
             opt.cmdargs.password,
             opt.cmdargs.use_backup,
-            opt.cmdargs.server + "/" + opt.cmdargs.port + ":" + opt.cmdargs.database,
+            opt.cmdargs.server
+            + "/"
+            + opt.cmdargs.port
+            + ":"
+            + opt.cmdargs.database,
         ]
         p = subprocess.Popen(
-            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            universal_newlines=True,
         )
-        res = p.communicate()
+        p.communicate()
         if p.returncode != 0:
             log.file.error(
-                f"Error restoring backup {opt.cmdargs.use_backup} to database {opt.cmdargs.database}"
+                f"Error restoring backup {opt.cmdargs.use_backup}"
+                f" to database {opt.cmdargs.database}"
             )
             sys.exit(1)
     fb = Firebird()
