@@ -164,17 +164,6 @@ class Firebird:
     Implements database processing
     """
 
-    def __init__(self):
-        """
-        Initializing default connection params
-        """
-        self.username = "SYSDBA"
-        self.password = "masterkey"
-        self.database = "employee"
-        self.host = "127.0.0.1"
-        self.port = 3050
-        self.charset = "UTF8"
-
     def Connect(
         self,
         database,
@@ -503,8 +492,10 @@ class SingleTest:
         green = "\x1b[32;20m"
         # self.StoreRes(self.__dics__)
         if hasattr(self, "data_files") and not opt.args.no_test_data:
-            log.stdout.info(f"{yellow}Preparing{reset} data for test "
-                            f"No{self.id} {self.name}")
+            log.stdout.info(
+                f"{yellow}Preparing{reset} data for test "
+                f"No{self.id} {self.name}"
+            )
             log.file.info(f"Preparing data for test No{self.id} {self.name}")
             for filename in self.data_files:
                 self.StoreRes(f"Processing data_file {filename}")
