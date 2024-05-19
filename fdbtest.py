@@ -503,6 +503,8 @@ class SingleTest:
         green = "\x1b[32;20m"
         # self.StoreRes(self.__dics__)
         if hasattr(self, "data_files") and not opt.args.no_test_data:
+            log.stdout.info(f"{yellow}Preparing{reset} data for test "
+                            f"No{self.id} {self.name}")
             log.file.info(f"Preparing data for test No{self.id} {self.name}")
             for filename in self.data_files:
                 self.StoreRes(f"Processing data_file {filename}")
@@ -516,54 +518,40 @@ class SingleTest:
             log.file.info(f"Failed: {self.id}, {self.name}")
 
 
-def main():
-    global log
-    global opt
-    global fb
-    opt = FBTOptions()
-    log = FBTLog(opt)
-    log.file.info(f"Script invoked with {str(opt.cmdargs)}")
-    if opt.cmdargs.use_backup:
-        log.file.info(
-            f"Restoring database {opt.cmdargs.database} from backup file {opt.cmdargs.use_backup}"
-        )
-        cmd = [
-            opt.cmdargs.gbak,
-            "-rep",
-            "-user",
-            opt.cmdargs.username,
-            "-pass",
-            opt.cmdargs.password,
-            opt.cmdargs.use_backup,
-            opt.cmdargs.server
-            + "/"
-            + opt.cmdargs.port
-            + ":"
-            + opt.cmdargs.database,
-        ]
-        p = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            universal_newlines=True,
-        )
-        p.communicate()
-        if p.returncode != 0:
-            log.file.error(
-                f"Error restoring backup {opt.cmdargs.use_backup}"
-                f" to database {opt.cmdargs.database}"
-            )
-            sys.exit(1)
-    fb = Firebird()
-    log.file.info(f"Connect to {opt.cmdargs.server}:{opt.cmdargs.database}")
-    fb.Connect(
-        opt.cmdargs.database,
-        opt.cmdargs.username,
-        opt.cmdargs.password,
-        opt.cmdargs.server,
-        opt.cmdargs.port,
+def restore_database(opt, log):
+    log.file.info(
+        f"Restoring database {opt.cmdargs.database} from backup file {opt.cmdargs.use_backup}"
     )
+    cmd = [
+        opt.cmdargs.gbak,
+        "-rep",
+        "-user",
+        opt.cmdargs.username,
+        "-pass",
+        opt.cmdargs.password,
+        opt.cmdargs.use_backup,
+        opt.cmdargs.server
+        + "/"
+        + opt.cmdargs.port
+        + ":"
+        + opt.cmdargs.database,
+    ]
+    p = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        universal_newlines=True,
+    )
+    p.communicate()
+    if p.returncode != 0:
+        log.file.error(
+            f"Error restoring backup {opt.cmdargs.use_backup}"
+            f" to database {opt.cmdargs.database}"
+        )
+        sys.exit(1)
 
+
+def run_tests(opt, log):
     if os.path.isdir(opt.cmdargs.run_test):
         for filename in sorted(os.listdir(opt.cmdargs.run_test)):
             ext = os.path.splitext(filename)[1]
@@ -580,6 +568,27 @@ def main():
         log.file.error(
             f"{opt.cmdargs.run_test} is neither file nor dir so nothing to run"
         )
+
+
+def main():
+    global log
+    global opt
+    global fb
+    opt = FBTOptions()
+    log = FBTLog(opt)
+    log.file.info(f"Script invoked with {str(opt.cmdargs)}")
+    if opt.cmdargs.use_backup:
+        restore_database(opt, log)
+    fb = Firebird()
+    log.file.info(f"Connect to {opt.cmdargs.server}:{opt.cmdargs.database}")
+    fb.Connect(
+        opt.cmdargs.database,
+        opt.cmdargs.username,
+        opt.cmdargs.password,
+        opt.cmdargs.server,
+        opt.cmdargs.port,
+    )
+    run_tests(opt, log)
 
 
 if __name__ == "__main__":
