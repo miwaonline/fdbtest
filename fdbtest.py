@@ -6,6 +6,7 @@ import yaml  # required external package
 import subprocess
 import sys
 import time
+import requests  # requires external package
 
 opt = 0
 log = 0
@@ -340,7 +341,12 @@ class SingleTest:
 
         # Execute statement and measure execution time
         timestart = time.perf_counter()
-        res = self._execute_statement(statement, paramlist)
+        if statement.get("sql"):
+            res = self._execute_sql_statement(statement, paramlist)
+        elif statement.get("curl"):
+            res = self._execute_http_request(statement, paramlist)
+        else:
+            res = ("Unsupported statement type",)
         timefinish = time.perf_counter()
 
         # Check the results
@@ -372,11 +378,54 @@ class SingleTest:
                 paramlist.append(test_vars[param.upper()])
         return paramlist
 
-    def _execute_statement(self, statement, paramlist):
+    def _execute_sql_statement(self, statement, paramlist):
         if type(statement.get("sql")) is list:
             res = fb.Execute(" ".join(statement.get("sql")), paramlist)
         else:
             res = fb.Execute(statement.get("sql"), paramlist)
+        return res
+
+    def _execute_http_request(self, statement, paramlist):
+        url = statement["curl"]
+        for i, param in enumerate(statement.get("params", [])):
+            url = url.replace(f":{param}", paramlist[i])
+
+        method = statement.get("method", "GET").upper()
+        headers = statement.get("headers", {})
+        data = statement.get("data", {})
+
+        try:
+            if method == "GET":
+                response = requests.get(
+                    url,
+                    headers=headers,
+                    timeout=statement.get("expect_duration", 10),
+                )
+            elif method == "POST":
+                response = requests.post(
+                    url,
+                    headers=headers,
+                    json=data,
+                    timeout=statement.get("expect_duration", 10),
+                )
+            else:
+                response = requests.request(
+                    method,
+                    url,
+                    headers=headers,
+                    json=data,
+                    timeout=statement.get("expect_duration", 10),
+                )
+
+            response.raise_for_status()  # Raise an error for bad status codes
+            res = (
+                response.json()
+                if response.headers["Content-Type"] == "application/json"
+                else response.text
+            )
+        except requests.RequestException as e:
+            res = (str(e),)
+
         return res
 
     def _check_results(
@@ -390,12 +439,14 @@ class SingleTest:
         paramlist,
     ):
         stmt_passed = True
-        if type(res) is tuple and len(res) == 3:
-            stmt_passed = self._handle_error(statement, res)
-            debug_str += "\n### Results:\n" + " ".join(str(r) for r in res)
-        else:
-            stmt_passed = self._handle_success(statement, res, test_vars)
-            debug_str += "\n### Results:\n" + str(res)
+        if "sql" in statement:
+            stmt_passed = self._check_sql_results(
+                statement, res, test_vars, debug_str
+            )
+        elif "curl" in statement:
+            stmt_passed = self._check_http_results(
+                statement, res, test_vars, debug_str
+            )
 
         if stmt_passed and statement.get("expect_duration"):
             stmt_passed, debug_str = self._check_duration(
@@ -407,11 +458,31 @@ class SingleTest:
         else:
             debug_str += "\nFAILED"
             log.file.error(
-                f"Error while executing statement: {statement.get('sql')} with"
-                f" params {paramlist}. {res}"
+                f"Error while executing statement: {statement.get('sql' if 'sql' in statement else 'curl')} with params {paramlist}. {res}"
             )
 
         return stmt_passed, debug_str
+
+    def _check_sql_results(self, statement, res, test_vars, debug_str):
+        if type(res) is tuple and len(res) == 3:
+            return self._handle_error(statement, res)
+        else:
+            stmt_passed = self._handle_success(statement, res, test_vars)
+            debug_str += "\n### Results:\n" + str(res)
+            return stmt_passed
+
+    def _check_http_results(self, statement, res, test_vars, debug_str):
+        stmt_passed = True
+        if "expect_values" in statement:
+            for key, expected_value in statement["expect_values"].items():
+                actual_value = res.get(key) if isinstance(res, dict) else res
+                stmt_passed = stmt_passed and self.CompareValues(
+                    str(actual_value), str(expected_value)
+                )
+                debug_str += f"\nComparing expected value '{expected_value}' with actual value '{actual_value}'"
+
+        debug_str += "\n### Results:\n" + str(res)
+        return stmt_passed
 
     def _handle_error(self, statement, res):
         stmt_passed = False
