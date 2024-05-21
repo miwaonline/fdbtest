@@ -1,3 +1,4 @@
+__version__='2.1'
 import os
 import fdb  # requires external package
 import logging
@@ -100,6 +101,12 @@ class FBTOptions:
                 "remove .log files from directory with results"
                 " before executing tests"
             ),
+        )
+        parser.add_argument(
+            "-v",
+            "--version",
+            action="version",
+            version='%(prog)s {version}'.format(version=__version__)
         )
         self.cmdargs = parser.parse_args()
         # now set proper gbak and isql values
@@ -389,13 +396,15 @@ class SingleTest:
 
     def _execute_http_request(self, statement, paramlist):
         url = statement['curl']
+        debug_str = '-'*80 + '\n'
         for i, param in enumerate(statement.get('params', [])):
             url = url.replace(f":{param}", paramlist[i])
+            debug_str += f":{param}: = {paramlist[i]}\n"
         method = statement.get('method', 'GET').upper()
         headers = statement.get('headers', {})
         data = statement.get('data', {})
 
-        debug_str = f"\n### HTTP Request:\nMethod: {method}\nURL: {url}\nHeaders: {headers}\nData: {data}\n"
+        debug_str += f"\n### HTTP Request:\nMethod: {method}\nURL: {url}\nHeaders: {headers}\nData: {data}\n"
         try:
             if method == 'GET':
                 response = requests.get(url, headers=headers, timeout=statement.get('expect_duration', 10))

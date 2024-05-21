@@ -6,4 +6,5 @@ description: "Curl"
 test_statements:
   - sql: "select cashregisternum from r_rro"
   - curl: "http://172.27.0.20:8088/api/rro/eusign/cmd/1/LastShiftTotals/:cashregisternum/"
+    params: ["cashregisternum"]
     expect_duration: 10
