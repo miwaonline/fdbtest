@@ -4,7 +4,7 @@ name: "Перевірка роботи curl"
 author: "miwaonline"
 description: "Curl"
 test_statements:
-  - sql: "select cashregisternum from r_rro"
-  - curl: "http://172.27.0.20:8088/api/rro/eusign/cmd/1/LastShiftTotals/:cashregisternum/"
-    params: ["cashregisternum"]
+  - sql: "select cashregisternum, 'http://172.27.0.20:8088/api/rro/eusign' as resturl from r_rro"
+  - curl: ":resturl/cmd/1/LastShiftTotals/:cashregisternum/"
+    params: ["resturl","cashregisternum"]
     expect_duration: 10

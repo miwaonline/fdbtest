@@ -1,13 +1,15 @@
-__version__='2.1'
 import os
 import fdb  # requires external package
 import logging
 import argparse
-import yaml  # required external package
+import yaml  # requires external package
+import json  # requires external package
 import subprocess
 import sys
 import time
 import requests  # requires external package
+
+__version__ = '2.1'
 
 opt = 0
 log = 0
@@ -396,15 +398,13 @@ class SingleTest:
 
     def _execute_http_request(self, statement, paramlist):
         url = statement['curl']
-        debug_str = '-'*80 + '\n'
         for i, param in enumerate(statement.get('params', [])):
             url = url.replace(f":{param}", paramlist[i])
-            debug_str += f":{param}: = {paramlist[i]}\n"
         method = statement.get('method', 'GET').upper()
         headers = statement.get('headers', {})
         data = statement.get('data', {})
 
-        debug_str += f"\n### HTTP Request:\nMethod: {method}\nURL: {url}\nHeaders: {headers}\nData: {data}\n"
+        debug_str = f"\n### HTTP Request:\nMethod: {method}\nURL: {url}\nHeaders: {headers}\nData: {data}\n"
         try:
             if method == 'GET':
                 response = requests.get(url, headers=headers, timeout=statement.get('expect_duration', 10))
@@ -413,8 +413,13 @@ class SingleTest:
             else:
                 response = requests.request(method, url, headers=headers, json=data, timeout=statement.get('expect_duration', 10))
             response.raise_for_status()  # Raise an error for bad status codes
-            res = response.json() if response.headers['Content-Type'] == 'application/json' else response.text
-            debug_str += f"Response: {res}\nStatus Code: {response.status_code}\n"
+            if 'application/json' in response.headers['Content-Type']:
+                res = response.json()
+                debug_str += f"JSON response:\n{json.dumps(res, indent=4)}\nStatus Code: {response.status_code}\n"
+            else:
+                res = response.text
+                debug_str += f"Text response: {res}\nStatus Code: {response.status_code}\n"
+
         except requests.RequestException as e:
             res = (str(e),)
             debug_str += f"Error: {res}\n"
