@@ -194,8 +194,9 @@ class Firebird:
 
     def Execute(self, statement, params=None):
         """
-        Executes statement and returns dict with corresponding values or tulip with
-        error information (error string, deprecated sql error code, gds error code)
+        Executes statement and returns dict with corresponding values or tulip
+        with error information (error string, deprecated sql error code, gds
+        error code)
         """
         cur = self.db.cursor()
         noresset = (
@@ -344,7 +345,8 @@ class SingleTest:
         if statement.get("sql"):
             res = self._execute_sql_statement(statement, paramlist)
         elif statement.get("curl"):
-            res = self._execute_http_request(statement, paramlist)
+            res, http_debug_str = self._execute_http_request(statement, paramlist)
+            debug_str += http_debug_str
         else:
             res = ("Unsupported statement type",)
         timefinish = time.perf_counter()
@@ -386,47 +388,28 @@ class SingleTest:
         return res
 
     def _execute_http_request(self, statement, paramlist):
-        url = statement["curl"]
-        for i, param in enumerate(statement.get("params", [])):
+        url = statement['curl']
+        for i, param in enumerate(statement.get('params', [])):
             url = url.replace(f":{param}", paramlist[i])
+        method = statement.get('method', 'GET').upper()
+        headers = statement.get('headers', {})
+        data = statement.get('data', {})
 
-        method = statement.get("method", "GET").upper()
-        headers = statement.get("headers", {})
-        data = statement.get("data", {})
-
+        debug_str = f"\n### HTTP Request:\nMethod: {method}\nURL: {url}\nHeaders: {headers}\nData: {data}\n"
         try:
-            if method == "GET":
-                response = requests.get(
-                    url,
-                    headers=headers,
-                    timeout=statement.get("expect_duration", 10),
-                )
-            elif method == "POST":
-                response = requests.post(
-                    url,
-                    headers=headers,
-                    json=data,
-                    timeout=statement.get("expect_duration", 10),
-                )
+            if method == 'GET':
+                response = requests.get(url, headers=headers, timeout=statement.get('expect_duration', 10))
+            elif method == 'POST':
+                response = requests.post(url, headers=headers, json=data, timeout=statement.get('expect_duration', 10))
             else:
-                response = requests.request(
-                    method,
-                    url,
-                    headers=headers,
-                    json=data,
-                    timeout=statement.get("expect_duration", 10),
-                )
-
+                response = requests.request(method, url, headers=headers, json=data, timeout=statement.get('expect_duration', 10))
             response.raise_for_status()  # Raise an error for bad status codes
-            res = (
-                response.json()
-                if response.headers["Content-Type"] == "application/json"
-                else response.text
-            )
+            res = response.json() if response.headers['Content-Type'] == 'application/json' else response.text
+            debug_str += f"Response: {res}\nStatus Code: {response.status_code}\n"
         except requests.RequestException as e:
             res = (str(e),)
-
-        return res
+            debug_str += f"Error: {res}\n"
+        return res, debug_str
 
     def _check_results(
         self,
